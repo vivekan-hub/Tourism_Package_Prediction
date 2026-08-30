@@ -1,0 +1,9 @@
+joblib @ file:///C:/Users/dev-admin/perseverance-python-buildout/croot/joblib_1729044354027/work
+pandas @ file:///C:/b/abs_e18w9ay4we/croot/pandas_1732735115740/work/dist/pandas-2.2.3-cp313-cp313-win_amd64.whl#sha256=89153934c68f42239148879a6c0fd8bb5004e767550db26257dc4551ad0414d7
+scikit-learn @ file:///C:/b/abs_0dwalqot3o/croot/scikit-learn_1737988780693/work/dist/scikit_learn-1.6.1-cp313-cp313-win_amd64.whl#sha256=3e52b503bae0e72bc233231ad5d730537e192e1214e0ac766be348eb9dfb7cfd
+streamlit @ file:///C:/b/abs_a5vo_b5ysk/croot/streamlit-split_1748963606986/work/streamlit
+xgboost==3.4.1
+streamlit==1.38.0
+pandas==2.2.2
+scikit-learn==1.5.1
+joblib==1.4.2
