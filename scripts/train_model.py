@@ -3,7 +3,7 @@ import numpy as np
 import joblib
 import json
 import sys
-from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (
@@ -17,7 +17,7 @@ MODEL_PATH = "models/best_model.pkl"
 METRICS_PATH = "models/metrics.json"
 PARAMS_PATH = "models/best_params.json"
 TARGET_COL = "ProdTaken"
-
+ENCODERS_PATH = "models/encoders.pkl" 
 
 def load_train_test():
     try:
@@ -59,13 +59,23 @@ def split_X_y(train_df, test_df):
 
 def tune_model(X_train, y_train):
     """Define model + param grid, run GridSearchCV."""
-    model = RandomForestClassifier(random_state=42, class_weight="balanced")
+    # Handle class imbalance the XGBoost way
+    scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
+    print(f"scale_pos_weight (for class imbalance): {scale_pos_weight:.3f}")
+
+    model = XGBClassifier(
+        random_state=42,
+        eval_metric="logloss",
+        scale_pos_weight=scale_pos_weight,
+        n_jobs=-1
+    )
 
     param_grid = {
         "n_estimators": [100, 200, 300],
-        "max_depth": [5, 10, 15, None],
-        "min_samples_split": [2, 5, 10],
-        "min_samples_leaf": [1, 2, 4],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.01, 0.05, 0.1],
+        "subsample": [0.8, 1.0],
+        "colsample_bytree": [0.8, 1.0],
     }
 
     grid_search = GridSearchCV(
@@ -116,9 +126,24 @@ def evaluate_model(model, X_test, y_test):
     return metrics
 
 
-def save_artifacts(model, best_params, metrics):
+def get_feature_importance(model, feature_names):
+    importance = model.feature_importances_
+    importance_df = pd.DataFrame({
+        "feature": feature_names,
+        "importance": importance
+    }).sort_values("importance", ascending=False)
+
+    print("\nTop 10 Feature Importances:")
+    print(importance_df.head(10).to_string(index=False))
+    return importance_df
+
+
+def save_artifacts(model, best_params, metrics, encoders):
     joblib.dump(model, MODEL_PATH)
     print(f"\nSaved best model to {MODEL_PATH}")
+
+    joblib.dump(encoders, ENCODERS_PATH)
+    print(f"Saved label encoders to {ENCODERS_PATH}")
 
     with open(PARAMS_PATH, "w") as f:
         json.dump(best_params, f, indent=2)
@@ -128,7 +153,6 @@ def save_artifacts(model, best_params, metrics):
         json.dump(metrics, f, indent=2)
     print(f"Saved metrics to {METRICS_PATH}")
 
-
 if __name__ == "__main__":
     train_df, test_df = load_train_test()
     train_df, test_df, encoders = encode_categoricals(train_df, test_df)
@@ -136,4 +160,5 @@ if __name__ == "__main__":
 
     best_model, best_params = tune_model(X_train, y_train)
     metrics = evaluate_model(best_model, X_test, y_test)
-    save_artifacts(best_model, best_params, metrics)
+    get_feature_importance(best_model, X_train.columns.tolist())
+    save_artifacts(best_model, best_params, metrics, encoders)  
