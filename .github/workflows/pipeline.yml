@@ -1,0 +1,122 @@
+name: MLOps Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:      # allows manual triggering from the Actions tab too
+
+jobs:
+
+  # ---------------------------------------------------
+  # JOB 1: Validate the raw dataset
+  # ---------------------------------------------------
+  validate-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas
+
+      - name: Run data validation
+        run: python scripts/validate_data.py
+
+  # ---------------------------------------------------
+  # JOB 2: Clean and split the data
+  # ---------------------------------------------------
+  data-prep:
+    needs: validate-data
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas scikit-learn
+
+      - name: Run data prep
+        run: python scripts/data_prep.py
+
+      - name: Upload train/test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: train-test-data
+          path: |
+            data/train.csv
+            data/test.csv
+
+  # ---------------------------------------------------
+  # JOB 3: Train the model with tuning + evaluation
+  # ---------------------------------------------------
+  train-model:
+    needs: data-prep
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas scikit-learn xgboost joblib
+
+      - name: Download train/test artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: train-test-data
+          path: data/
+
+      - name: Run model training
+        run: python scripts/train_model.py
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: |
+            models/best_model.pkl
+            models/encoders.pkl
+            models/best_params.json
+            models/metrics.json
+
+  # ---------------------------------------------------
+  # JOB 4: Commit the trained model back to the repo
+  # ---------------------------------------------------
+  commit-model:
+    needs: train-model
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # needed to allow this job to push commits
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: models/
+
+      - name: Commit and push updated model
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add models/
+          git diff --staged --quiet && echo "No changes to commit" || git commit -m "Auto-update model [skip ci]"
+          git push
