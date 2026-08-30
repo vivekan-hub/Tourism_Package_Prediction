@@ -114,3 +114,4 @@ if __name__ == "__main__":
     pipeline = build_pipeline(X_train)
     best_pipeline, best_params, metrics = tune_and_log(pipeline, X_train, y_train, X_test, y_test)
     save_artifacts(best_pipeline, best_params, metrics)
+retrain trigger
