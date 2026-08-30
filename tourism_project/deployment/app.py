@@ -5,17 +5,14 @@ import os
 
 DEPLOY_DIR = os.path.dirname(__file__)
 MODEL_PATH = os.path.join(DEPLOY_DIR, "best_model.pkl")
-ENCODERS_PATH = os.path.join(DEPLOY_DIR, "encoders.pkl")
 
 st.set_page_config(page_title="Wellness Package Predictor", page_icon="🧳")
 
 @st.cache_resource
-def load_artifacts():
-    model = joblib.load(MODEL_PATH)
-    encoders = joblib.load(ENCODERS_PATH)
-    return model, encoders
+def load_pipeline():
+    return joblib.load(MODEL_PATH)
 
-model, encoders = load_artifacts()
+pipeline = load_pipeline()
 
 st.title("🧳 Wellness Tourism Package — Purchase Predictor")
 st.write("Enter customer details to predict whether they are likely to purchase the Wellness Tourism Package.")
@@ -44,6 +41,8 @@ with col2:
     num_followups = st.number_input("Number of Follow-ups", min_value=0, max_value=10, value=3)
     duration_of_pitch = st.number_input("Duration of Pitch (minutes)", min_value=0, max_value=60, value=15)
 
+# Build a raw input dataframe — NO manual encoding needed.
+# The pipeline's ColumnTransformer (StandardScaler + OneHotEncoder) handles it internally.
 input_data = {
     "Age": age,
     "TypeofContact": type_of_contact,
@@ -67,24 +66,11 @@ input_data = {
 
 input_df = pd.DataFrame([input_data])
 
-def encode_input(df: pd.DataFrame, encoders: dict) -> pd.DataFrame:
-    df = df.copy()
-    for col, le in encoders.items():
-        if col in df.columns:
-            val = df[col].iloc[0]
-            if val not in le.classes_:
-                val = le.classes_[0]
-            df[col] = le.transform([val])
-    return df
-
-encoded_df = encode_input(input_df, encoders)
-encoded_df = encoded_df[model.get_booster().feature_names] if hasattr(model, "get_booster") else encoded_df
-
 st.divider()
 
 if st.button("Predict", type="primary"):
-    prediction = model.predict(encoded_df)[0]
-    probability = model.predict_proba(encoded_df)[0][1]
+    prediction = pipeline.predict(input_df)[0]
+    probability = pipeline.predict_proba(input_df)[0][1]
 
     if prediction == 1:
         st.success("✅ This customer is **likely to purchase** the Wellness Package.")
